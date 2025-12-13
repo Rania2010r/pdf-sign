@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [ready_for_review]
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: pdf-sign
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ github.event_name == 'pull_request' }}
+
+      - name: Build (flake)
+        run: |
+          nix build .#pdf-sign --out-link result
+
+      - name: Collect artifact
+        run: |
+          mkdir -p dist
+          cp -L result/bin/pdf-sign "dist/pdf-sign-${{ runner.os }}-$(uname -m)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-sign-${{ runner.os }}-${{ matrix.os }}
+          path: dist/*
+
+

@@ -15,7 +15,7 @@ The signed output stays minimal: the original PDF content is preserved and the s
 * **Simple CLI**: `sign` and `verify` commands that compose well in pipelines.
 * **Works with your existing GPG setup**: Uses `gpg-agent` (smartcards/YubiKey supported) and reads your local keybox (`pubring.kbx`) for public key lookups.
 * **Hardware-friendly**: Private keys can stay on a smartcard/YubiKey.
-* **Lightweight distribution**: Single-file script you can run directly (see Quickstart).
+* **Lightweight distribution**: Standard Cargo binary (`cargo install …`) with no `gpg` subprocesses.
 
 ## Security model
 
@@ -26,23 +26,49 @@ The signed output stays minimal: the original PDF content is preserved and the s
 
 ## Quickstart
 
-### Zero-Install Execution
-
-Download the script and execute it. The `nix-shell` shebang will provision dependencies automatically.
+### Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0x77dev/pdf-sign/main/pdf-sign.rs -o pdf-sign.rs
-chmod +x pdf-sign.rs
-./pdf-sign.rs sign document.pdf --key 0xDEADBEEF
+cargo install --git https://github.com/0x77dev/pdf-sign --locked
+pdf-sign sign document.pdf --key 0xDEADBEEF
 ```
 
-### Local Execution
+### Local build/run
 
-If you already have `pdf-sign.rs` locally, ensure it's executable. The shebang handles the rest.
+If you cloned the repo:
 
 ```bash
-chmod +x pdf-sign.rs
-./pdf-sign.rs sign input.pdf --key 0xDEADBEEF
+cargo build --release
+./target/release/pdf-sign sign input.pdf --key 0xDEADBEEF
+```
+
+### Nix (flake)
+
+```bash
+nix develop
+cargo build
+```
+
+Remote (no clone):
+
+```bash
+# Run directly from GitHub
+nix run github:0x77dev/pdf-sign -- --help
+
+# Dev shell from GitHub
+nix develop github:0x77dev/pdf-sign -c cargo build
+```
+
+Build a package:
+
+```bash
+nix build
+```
+
+Remote build:
+
+```bash
+nix build github:0x77dev/pdf-sign#pdf-sign
 ```
 
 ## Methodology
@@ -56,7 +82,7 @@ chmod +x pdf-sign.rs
 
 ## Requirements
 
-* **Nix Package Manager**: Used for reproducible, hermetic runtime environment bootstrapping.
+* **Rust toolchain**: `cargo` + a recent Rust compiler.
 * **GnuPG**: A running `gpg-agent`.
 * **Public Certificate**: The public key must be importable or available (file or keyring).
 * **Private Key**: Managed by `gpg-agent` (Softkey or Smartcard/YubiKey).
@@ -70,7 +96,7 @@ Signs a PDF. Requires a key specification (File path, Key ID, Fingerprint, or Em
 If the input PDF already has appended OpenPGP signatures, `sign` preserves them and appends an additional signature (multi-signer workflow).
 
 ```bash
-./pdf-sign.rs sign contract.pdf --key 0xF1171FAAAA237211
+pdf-sign sign contract.pdf --key 0xF1171FAAAA237211
 ```
 
 * **--output, -o**: Specify output path (Default: `input_signed.pdf`).
@@ -85,7 +111,7 @@ Verifies the appended signature. If `--cert` is omitted, it will look up the sig
 If multiple signatures are appended, `verify` checks **all** of them and prints each signer’s details.
 
 ```bash
-./pdf-sign.rs verify contract_signed.pdf
+pdf-sign verify contract_signed.pdf
 ```
 
 * **--cert, -c**: Optional. Can be provided multiple times. Public certificate file path, fingerprint, key ID, or email.
