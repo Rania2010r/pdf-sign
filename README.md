@@ -6,20 +6,19 @@ A minimalist, agent-centric PDF signing utility written in Rust utilizing. It ge
 
 ### Zero-Install Execution
 
-Leverage `nix-shell` to pull dependencies, compile, and execute the artifact ephemerally directly from the source URL.
+Download the script and execute it. The `nix-shell` shebang will provision dependencies automatically.
 
 ```bash
-nix-shell \
-  https://raw.githubusercontent.com/0x77dev/pdf-sign/main/pdf-sign.rs \
-  -- sign document.pdf --key 0xDEADBEEF
+curl -fsSL https://raw.githubusercontent.com/0x77dev/pdf-sign/main/pdf-sign.rs -o pdf-sign.rs
+chmod +x pdf-sign.rs
+./pdf-sign.rs sign document.pdf --key 0xDEADBEEF
 ```
 
 ### Local Execution
 
-Ensure the script is executable. The shebang handles the rest.
+If you already have `pdf-sign.rs` locally, ensure it's executable. The shebang handles the rest.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0x77dev/pdf-sign/main/pdf-sign.rs -o pdf-sign.rs
 chmod +x pdf-sign.rs
 ./pdf-sign.rs sign input.pdf --key 0xDEADBEEF
 ```
