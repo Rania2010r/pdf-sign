@@ -36,6 +36,10 @@ jobs:
         run: |
           nix build .#pdf-sign --out-link result
 
+      - name: Test (flake checks)
+        run: |
+          nix flake check -L
+
       - name: Collect artifact
         run: |
           mkdir -p dist
