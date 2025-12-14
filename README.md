@@ -10,6 +10,53 @@ It’s designed to be a practical alternative to “traditional” PDF signing w
 
 The signed output stays minimal: the original PDF content is preserved and the signature is appended, keeping the file compliant so it still opens normally in standard PDF viewers.
 
+## Quickstart
+
+### Install with Cargo
+
+```bash
+cargo install --git https://github.com/0x77dev/pdf-sign --locked
+pdf-sign sign document.pdf --key 0xDEADBEEF
+```
+
+### Install with Nix Profile
+
+```bash
+nix profile install github:0x77dev/pdf-sign#pdf-sign
+pdf-sign sign document.pdf --key 0xDEADBEEF
+```
+
+### Build from Source
+
+If you cloned the repo:
+
+```bash
+cargo build --release
+./target/release/pdf-sign sign input.pdf --key 0xDEADBEEF
+```
+
+With Nix (flake):
+
+```bash
+# Development shell
+nix develop
+cargo build
+
+# Or build the package directly
+nix build
+./result/bin/pdf-sign sign input.pdf --key 0xDEADBEEF
+```
+
+Remote (no clone):
+
+```bash
+# Run directly from GitHub
+nix run github:0x77dev/pdf-sign -- --help
+
+# Build package from GitHub
+nix build github:0x77dev/pdf-sign#pdf-sign
+```
+
 ## Features
 
 * **Simple CLI**: `sign` and `verify` commands that compose well in pipelines.
@@ -23,53 +70,6 @@ The signed output stays minimal: the original PDF content is preserved and the s
 * **Reduced key exposure**: Private keys never need to be loaded into this process.
 * **Explicit verification**: Verifies using your local keybox by default (no `gpg` subprocess), or a provided certificate via `--cert`.
 * **Privacy by default**: Signer UIDs (name/email) are not embedded in the signature unless enabled.
-
-## Quickstart
-
-### Install
-
-```bash
-cargo install --git https://github.com/0x77dev/pdf-sign --locked
-pdf-sign sign document.pdf --key 0xDEADBEEF
-```
-
-### Local build/run
-
-If you cloned the repo:
-
-```bash
-cargo build --release
-./target/release/pdf-sign sign input.pdf --key 0xDEADBEEF
-```
-
-### Nix (flake)
-
-```bash
-nix develop
-cargo build
-```
-
-Remote (no clone):
-
-```bash
-# Run directly from GitHub
-nix run github:0x77dev/pdf-sign -- --help
-
-# Dev shell from GitHub
-nix develop github:0x77dev/pdf-sign -c cargo build
-```
-
-Build a package:
-
-```bash
-nix build
-```
-
-Remote build:
-
-```bash
-nix build github:0x77dev/pdf-sign#pdf-sign
-```
 
 ## Methodology
 
