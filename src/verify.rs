@@ -2,14 +2,14 @@ use crate::json::{VerifyJson, VerifySignatureJson};
 use crate::keybox::{find_certs_in_keybox, load_cert, load_keybox_certs};
 use crate::pdf::{extract_armored_signatures, find_eof_offset};
 use crate::util::format_bytes;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use sequoia_openpgp as openpgp;
 use openpgp::cert::prelude::*;
 use openpgp::parse::Parse;
 use openpgp::parse::stream::*;
 use openpgp::policy::StandardPolicy;
+use sequoia_openpgp as openpgp;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -30,8 +30,8 @@ impl VerificationHelper for Helper {
         }
 
         if self.keybox.is_none() {
-            let certs = load_keybox_certs()
-                .map_err(|e| openpgp::Error::InvalidOperation(e.to_string().into()))?;
+            let certs =
+                load_keybox_certs().map_err(|e| openpgp::Error::InvalidOperation(e.to_string()))?;
             self.keybox = Some(certs);
         }
 
@@ -59,14 +59,20 @@ impl VerificationHelper for Helper {
     fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
         for layer in structure.into_iter() {
             if let MessageLayer::SignatureGroup { results } = layer {
+                let mut last_error = None;
                 for result in results {
                     match result {
                         Ok(good) => {
                             *self.signer_cert.borrow_mut() = Some(good.ka.cert().clone());
                             return Ok(());
                         }
-                        Err(e) => return Err(openpgp::Error::from(e).into()),
+                        Err(e) => {
+                            last_error = Some(e);
+                        }
                     }
+                }
+                if let Some(e) = last_error {
+                    return Err(openpgp::Error::from(e).into());
                 }
             }
         }
@@ -111,13 +117,14 @@ pub(crate) fn verify_pdf(input: PathBuf, cert_spec: Vec<String>, json: bool) -> 
         bail!("No PGP signature found after %%EOF marker");
     }
 
-    eprintln!(
-        "    Found {} signature(s)",
-        style(signatures.len()).cyan()
-    );
+    eprintln!("    Found {} signature(s)", style(signatures.len()).cyan());
 
     // Load verification certificates (optional; otherwise we use the GnuPG keybox via Helper)
-    let cert_source = if cert_spec.is_empty() { "keybox" } else { "cert" };
+    let cert_source = if cert_spec.is_empty() {
+        "keybox"
+    } else {
+        "cert"
+    };
     let certs: Vec<Cert> = cert_spec
         .iter()
         .map(|spec| load_cert(spec))
@@ -144,7 +151,8 @@ pub(crate) fn verify_pdf(input: PathBuf, cert_spec: Vec<String>, json: bool) -> 
             signer_cert: signer_cert.clone(),
         };
 
-        let mut verifier = DetachedVerifierBuilder::from_bytes(sig)?.with_policy(&policy, None, helper)?;
+        let mut verifier =
+            DetachedVerifierBuilder::from_bytes(sig)?.with_policy(&policy, None, helper)?;
 
         verifier
             .verify_bytes(pdf_data)
@@ -196,15 +204,10 @@ pub(crate) fn verify_pdf(input: PathBuf, cert_spec: Vec<String>, json: bool) -> 
     }
 
     if json {
-        let first = verified.first();
         let payload = VerifyJson {
             status: "ok",
             command: "verify",
             input: input.display().to_string(),
-            key_fingerprint: first
-                .map(|s| s.key_fingerprint.clone())
-                .unwrap_or_default(),
-            uids: first.map(|s| s.uids.clone()).unwrap_or_default(),
             cert_source,
             signatures: verified,
         };
@@ -215,5 +218,3 @@ pub(crate) fn verify_pdf(input: PathBuf, cert_spec: Vec<String>, json: bool) -> 
 
     Ok(())
 }
-
-

@@ -29,11 +29,7 @@ pub fn run(cli: Cli) -> Result<()> {
             // JSON goes to stdout for tooling.
             println!("{}", serde_json::to_string(&payload)?);
         } else {
-            eprintln!(
-                "\n{} {}",
-                style("[ERROR]").red().bold(),
-                style(&e).red()
-            );
+            eprintln!("\n{} {}", style("[ERROR]").red().bold(), style(&e).red());
 
             for (i, cause) in e.chain().skip(1).enumerate() {
                 if i == 0 {
@@ -47,5 +43,3 @@ pub fn run(cli: Cli) -> Result<()> {
 
     result
 }
-
-

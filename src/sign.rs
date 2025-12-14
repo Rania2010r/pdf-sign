@@ -5,17 +5,29 @@ use crate::util::format_bytes;
 use anyhow::{Context, Result};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use sequoia_openpgp as openpgp;
 use openpgp::armor;
-use openpgp::packet::signature::subpacket::NotationDataFlags;
 use openpgp::packet::signature::SignatureBuilder;
+use openpgp::packet::signature::subpacket::NotationDataFlags;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::*;
 use openpgp::types::SignatureType;
+use sequoia_openpgp as openpgp;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+fn default_signed_output_path(input: &Path) -> Result<PathBuf> {
+    let mut p = input.to_path_buf();
+    let stem = p
+        .file_stem()
+        .context("Input path must include a file name (cannot derive default output path)")?;
+    let mut name: OsString = stem.to_os_string();
+    name.push("_signed.pdf");
+    p.set_file_name(name);
+    Ok(p)
+}
 
 pub(crate) fn sign_pdf(
     input: PathBuf,
@@ -162,12 +174,10 @@ pub(crate) fn sign_pdf(
     ));
 
     // Write signed PDF
-    let output_path = output.unwrap_or_else(|| {
-        let mut p = input.clone();
-        let stem = p.file_stem().unwrap().to_str().unwrap();
-        p.set_file_name(format!("{}_signed.pdf", stem));
-        p
-    });
+    let output_path = match output {
+        Some(p) => p,
+        None => default_signed_output_path(&input)?,
+    };
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
@@ -223,4 +233,51 @@ pub(crate) fn sign_pdf(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::default_signed_output_path;
+    use std::ffi::OsStr;
+    #[cfg(unix)]
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    use std::path::PathBuf;
 
+    #[test]
+    fn default_output_path_normal() {
+        let input = PathBuf::from("/tmp/document.pdf");
+        let out = default_signed_output_path(&input).unwrap();
+        assert_eq!(out, PathBuf::from("/tmp/document_signed.pdf"));
+    }
+
+    #[test]
+    fn default_output_path_hidden_dotfile_like_pdf() {
+        let input = PathBuf::from("/tmp/.pdf");
+        let out = default_signed_output_path(&input).unwrap();
+        assert_eq!(out, PathBuf::from("/tmp/.pdf_signed.pdf"));
+    }
+
+    #[test]
+    fn default_output_path_root_has_no_filename() {
+        let input = PathBuf::from("/");
+        let err = default_signed_output_path(&input).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("cannot derive default output path"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn default_output_path_non_utf8_stem_does_not_panic() {
+        let input = PathBuf::from(std::ffi::OsString::from_vec(vec![
+            0xFF, 0xFE, b'.', b'p', b'd', b'f',
+        ]));
+        let out = default_signed_output_path(&input).unwrap();
+        let name = out.file_name().unwrap();
+        // We can't compare to &str here; just ensure it's the stem + suffix.
+        // file_stem() strips the ".pdf" extension, so the stem is just [0xFF, 0xFE].
+        let mut expected = OsStr::from_bytes(&[0xFF, 0xFE]).to_os_string();
+        expected.push("_signed.pdf");
+        assert_eq!(name, expected);
+    }
+}

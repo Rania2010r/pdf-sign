@@ -1,9 +1,10 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use sequoia_openpgp as openpgp;
 use openpgp::cert::prelude::*;
 use openpgp::parse::Parse;
+use sequoia_openpgp as openpgp;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -23,35 +24,61 @@ pub(crate) fn load_keybox_certs() -> Result<Vec<Cert>> {
     use sequoia_gpg_agent::sequoia_ipc::keybox::{Keybox, KeyboxRecord};
 
     let primary = keybox_path()?;
-    let fallback = primary.with_file_name(format!(
-        "{}~",
-        primary
+    let fallback = primary.with_file_name({
+        let mut name = primary
             .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("pubring.kbx")
-    ));
+            .unwrap_or_else(|| OsStr::new("pubring.kbx"))
+            .to_os_string();
+        name.push("~");
+        name
+    });
 
     let candidates = [primary, fallback];
+    let mut last_error: Option<anyhow::Error> = None;
     for path in candidates {
         if !path.exists() {
             continue;
         }
 
-        let kbx = Keybox::from_file(&path)
-            .with_context(|| format!("Failed to read GnuPG keybox at {}", path.display()))?;
-        let certs = kbx
+        let kbx = match Keybox::from_file(&path) {
+            Ok(kbx) => kbx,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(
+                    "Failed to read GnuPG keybox at {}: {}",
+                    path.display(),
+                    e
+                ));
+                continue;
+            }
+        };
+
+        let certs = match kbx
             .filter_map(|r| r.ok())
             .filter_map(|r| match r {
                 KeyboxRecord::OpenPGP(o) => Some(o.cert()),
                 _ => None,
             })
-            .collect::<openpgp::Result<Vec<Cert>>>()?;
+            .collect::<openpgp::Result<Vec<Cert>>>()
+        {
+            Ok(certs) => certs,
+            Err(e) => {
+                last_error = Some(anyhow::anyhow!(
+                    "Failed to read certificates from keybox at {}: {}",
+                    path.display(),
+                    e
+                ));
+                continue;
+            }
+        };
 
         if !certs.is_empty() {
             return Ok(certs);
         }
     }
 
+    if let Some(e) = last_error {
+        return Err(e);
+    }
     bail!("No OpenPGP certificates found in your keybox. Provide a certificate file path instead.")
 }
 
@@ -69,7 +96,8 @@ pub(crate) fn find_certs_in_keybox(certs: &[Cert], key_spec: &str) -> Vec<Cert> 
     let needle_hex = normalize_hexish(key_spec);
     let needle_lc = key_spec.trim().to_lowercase();
 
-    certs.iter()
+    certs
+        .iter()
         .filter_map(|cert| {
             let matches_fpr = !needle_hex.is_empty()
                 && normalize_hexish(&cert.fingerprint().to_string()) == needle_hex;
@@ -117,10 +145,7 @@ pub(crate) fn load_cert(spec: &str) -> Result<Cert> {
         return result;
     }
 
-    spinner.set_message(format!(
-        "Searching GnuPG keybox for {}",
-        style(spec).cyan()
-    ));
+    spinner.set_message(format!("Searching GnuPG keybox for {}", style(spec).cyan()));
     let certs = load_keybox_certs()?;
     let matches = find_certs_in_keybox(&certs, spec);
     spinner.finish_and_clear();
@@ -136,14 +161,12 @@ pub(crate) fn load_cert(spec: &str) -> Result<Cert> {
         eprintln!(
             "{} {}",
             style("Warning:").yellow().bold(),
-            format!(
+            format_args!(
                 "Multiple keys found for '{}'. Using the first one.",
                 style(spec).cyan()
-            )
+            ),
         );
     }
 
     Ok(matches.into_iter().next().unwrap())
 }
-
-

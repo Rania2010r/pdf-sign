@@ -47,5 +47,3 @@ pub enum Commands {
         cert: Vec<String>,
     },
 }
-
-

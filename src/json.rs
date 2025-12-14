@@ -16,8 +16,6 @@ pub(crate) struct VerifyJson<'a> {
     pub status: &'a str,
     pub command: &'a str,
     pub input: String,
-    pub key_fingerprint: String,
-    pub uids: Vec<String>,
     pub cert_source: &'a str,
     pub signatures: Vec<VerifySignatureJson>,
 }
@@ -35,5 +33,3 @@ pub(crate) struct ErrorJson<'a> {
     pub error: String,
     pub causes: Vec<String>,
 }
-
-

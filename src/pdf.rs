@@ -30,7 +30,13 @@ pub(crate) fn extract_armored_signatures(data: &[u8]) -> Vec<Vec<u8>> {
         };
         let mut end_pos = end + PGP_SIG_END.len();
         // Include at most one trailing newline after the END marker if present.
-        if end_pos < data.len() && data[end_pos] == b'\n' {
+        // Preserve both LF and CRLF line endings byte-for-byte.
+        if end_pos < data.len() && data[end_pos] == b'\r' {
+            end_pos += 1;
+            if end_pos < data.len() && data[end_pos] == b'\n' {
+                end_pos += 1;
+            }
+        } else if end_pos < data.len() && data[end_pos] == b'\n' {
             end_pos += 1;
         }
         sigs.push(data[begin..end_pos].to_vec());
@@ -39,4 +45,31 @@ pub(crate) fn extract_armored_signatures(data: &[u8]) -> Vec<Vec<u8>> {
     sigs
 }
 
+#[cfg(test)]
+mod tests {
+    use super::extract_armored_signatures;
 
+    #[test]
+    fn preserves_crlf_after_end_marker() {
+        let sig = b"-----BEGIN PGP SIGNATURE-----\r\n\
+Version: Test\r\n\
+\r\n\
+abc\r\n\
+-----END PGP SIGNATURE-----\r\n";
+        let out = extract_armored_signatures(sig);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].as_slice(), sig);
+    }
+
+    #[test]
+    fn preserves_lf_after_end_marker() {
+        let sig = b"-----BEGIN PGP SIGNATURE-----\n\
+Version: Test\n\
+\n\
+abc\n\
+-----END PGP SIGNATURE-----\n";
+        let out = extract_armored_signatures(sig);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].as_slice(), sig);
+    }
+}

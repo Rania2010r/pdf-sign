@@ -4,16 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - name: linux-amd64
+            runs_on: ubuntu-24.04
+          - name: linux-arm64
+            runs_on: ubuntu-24.04-arm
+          - name: macos-arm64
+            runs_on: macos-26
 
     steps:
       - name: Checkout
@@ -48,7 +54,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pdf-sign-${{ runner.os }}-${{ matrix.os }}
+          name: pdf-sign-${{ matrix.name }}
           path: dist/*
 
 
