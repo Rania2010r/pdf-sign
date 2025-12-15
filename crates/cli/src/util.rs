@@ -3,6 +3,9 @@
 pub fn format_bytes(bytes: usize) -> String {
   const KB: f64 = 1024.0;
   const MB: f64 = KB * 1024.0;
+  // Threshold chosen to avoid displaying "1024.0 KB" due to rounding.
+  // At 1_048_524 bytes (1023.99 KB), we still show KB.
+  // At 1_048_525 bytes and above, we switch to MB display.
   const KB_TO_MB_ROUNDING_THRESHOLD: usize = 1_048_525;
 
   if bytes < 1024 {

@@ -58,14 +58,6 @@ pub fn sign_gpg(
   let (clean_pdf, suffix) = split_pdf(&pdf_data)?;
   let existing_blocks = parse_suffix_blocks(suffix)?;
 
-  let existing_pgp_sigs: Vec<_> = existing_blocks
-    .iter()
-    .filter_map(|b| match b {
-      SuffixBlock::OpenPgpSig(data) => Some(data.clone()),
-      _ => None,
-    })
-    .collect();
-
   let cert = pdf_sign_gpg::load_cert(&key_spec)?;
 
   let fingerprint = cert.fingerprint();
@@ -132,11 +124,10 @@ pub fn sign_gpg(
   out.write_all(clean_pdf)?;
   out.write_all(b"\n")?;
 
-  for sig in &existing_pgp_sigs {
-    out.write_all(sig)?;
-    if !sig.ends_with(b"\n") {
-      out.write_all(b"\n")?;
-    }
+  // Preserve existing signature blocks (OpenPGP and Sigstore) when adding a new GPG signature.
+  for block in &existing_blocks {
+    let encoded = encode_suffix_block(block);
+    out.write_all(&encoded)?;
   }
   out.write_all(&sign_result.signature_data)?;
   out.flush()?;

@@ -1,6 +1,6 @@
 # pdf-sign
 
-A lightweight, modern PDF signing utility written in Rust that supports both **OpenPGP (GPG)** and **Sigstore (keyless OIDC)** signatures. It appends cryptographic signatures directly to PDFs, making it easy to sign and verify documents without heavyweight PDF signing stacks, making your PDFs authentic and tamper-proof.
+PDF signing utility written in Rust that supports both **OpenPGP (GPG)** and **Sigstore (keyless OIDC)** signatures, appending cryptographic signatures directly to PDFs, making it easy to sign and verify documents without heavyweight PDF signing stacks, making your PDFs authentic, tamper-proof, while being fully compatible with regular readers.
 
 [![asciicast](https://asciinema.org/a/JXR1crpqtcbMT1DIhD3dzXFB9.svg)](https://asciinema.org/a/JXR1crpqtcbMT1DIhD3dzXFB9)
 
@@ -280,11 +280,20 @@ Versioned bilrost-encoded blocks with digest binding:
 
 ## Environment Variables
 
+### General
+
 * `GNUPGHOME`: GPG keybox location (default: `~/.gnupg`)
 * `RUST_LOG`: Tracing verbosity (e.g., `RUST_LOG=debug`)
-* Output channels:
-  * `stderr`: Progress, status, errors
-  * `stdout`: Result paths (sign) or "OK" (verify) for pipelines
+
+### Sigstore-Specific
+
+* `SIGSTORE_IDENTITY_TOKEN`: Pre-obtained OIDC identity token (JWT) for CI workflows (bypasses interactive browser flow)
+* `OIDC_REDIRECT_PORT`: Local port for OIDC callback listener (default: OS-assigned dynamic port). Set to a fixed port (e.g., `8080`) if you need predictable port forwarding or firewall rules
+
+### Output Channels
+
+* `stderr`: Progress, status, errors
+* `stdout`: Result paths (sign) or "OK" (verify) for pipelines
 
 ## Examples
 

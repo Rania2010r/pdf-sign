@@ -102,13 +102,25 @@ pub fn apply_response(
     split_pdf,
     suffix::{encode_suffix_block, parse_suffix_blocks},
   };
-  let _ = challenge;
   // For WASM we keep `apply_response` intentionally minimal: it performs basic
   // format validation and appends the provided ASCII-armored signature.
+  //
+  // We still validate that the challenge's `dataBase64` matches the PDF bytes
+  // that are about to be signed, to avoid accidentally applying a signature to
+  // the wrong document.
 
   // Split PDF
   let (clean_pdf, suffix) =
     split_pdf(pdf_bytes).map_err(|e| format!("Failed to parse PDF: {}", e))?;
+
+  // Validate challenge against the PDF
+  let challenge_data = base64::engine::general_purpose::STANDARD
+    .decode(&challenge.data_base64)
+    .map_err(|e| format!("Failed to decode challenge data: {}", e))?;
+
+  if clean_pdf != challenge_data.as_slice() {
+    return Err("PDF data does not match challenge".to_string());
+  }
 
   let existing_blocks = parse_suffix_blocks(suffix)
     .map_err(|e| format!("Failed to parse existing signatures: {}", e))?;

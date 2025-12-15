@@ -3,6 +3,12 @@
 # Runs in Nix sandbox (offline) for GPG tests, and optionally with network for Sigstore.
 set -euo pipefail
 
+# Verify pdf-sign binary is available
+if [[ -z "${PDF_SIGN:-}" ]] || ! command -v "$PDF_SIGN" &>/dev/null; then
+  echo "ERROR: PDF_SIGN binary not found or not in PATH" >&2
+  exit 1
+fi
+
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
 chmod 700 "$GNUPGHOME"
@@ -47,14 +53,25 @@ echo "    [OK] Multi-party GPG signing passed"
 
 # Sigstore tests require network and OIDC token
 if [[ -n "${SIGSTORE_IDENTITY_TOKEN:-}" ]]; then
+  if [[ -z "$SIGSTORE_IDENTITY_TOKEN" ]]; then
+    echo "ERROR: SIGSTORE_IDENTITY_TOKEN is set but empty" >&2
+    exit 1
+  fi
+
   echo "==> Test 3: Sigstore sign + verify"
-  sigstore_signed="$("$PDF_SIGN" sign --backend sigstore input.pdf --identity-token "$SIGSTORE_IDENTITY_TOKEN")"
+  sigstore_signed="$("$PDF_SIGN" sign input.pdf --backend sigstore --identity-token "$SIGSTORE_IDENTITY_TOKEN")" || {
+    echo "ERROR: Sigstore sign failed (token may be invalid or expired)" >&2
+    exit 1
+  }
   "$PDF_SIGN" verify "$sigstore_signed" | grep -x OK >/dev/null
   echo "    [OK] Sigstore sign + verify passed"
 
   echo "==> Test 4: Multi-backend signing (GPG + Sigstore)"
   # Start with GPG-signed PDF, add Sigstore signature
-  multi_backend="$("$PDF_SIGN" sign --backend sigstore "$signed" --identity-token "$SIGSTORE_IDENTITY_TOKEN")"
+  multi_backend="$("$PDF_SIGN" sign "$signed" --backend sigstore --identity-token "$SIGSTORE_IDENTITY_TOKEN")" || {
+    echo "ERROR: Sigstore sign failed (token may be invalid or expired)" >&2
+    exit 1
+  }
   # Verify should find both GPG and Sigstore signatures
   "$PDF_SIGN" verify "$multi_backend" --cert cert1.asc | grep -x OK >/dev/null
   echo "    [OK] Multi-backend signing passed"

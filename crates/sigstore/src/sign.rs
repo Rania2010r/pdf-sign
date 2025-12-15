@@ -4,6 +4,7 @@ use anyhow::{Context, Result, bail};
 use pdf_sign_core::{DigestAlgorithm, compute_digest, suffix::SigstoreBundleBlock};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use std::time::Duration;
 
 /// Sigstore service endpoints configuration.
 #[derive(Debug, Clone)]
@@ -68,7 +69,25 @@ pub struct SignResult {
 pub async fn sign_blob(data: &[u8], options: &SignOptions) -> Result<SignResult> {
   tracing::info!("Starting Sigstore keyless signing");
 
-  // Initialize signing context with configured endpoints
+  // Initialize signing context.
+  //
+  // NOTE: sigstore-rs' `SigningContext::async_production()` hardcodes production
+  // Fulcio/Rekor endpoints. The crate currently does not expose a public API to
+  // construct a `SigningContext` with custom Fulcio/Rekor URLs.
+  //
+  // We still keep `SigstoreEndpoints.{fulcio_url, rekor_url}` for future
+  // compatibility, and so callers can configure OIDC issuer/client parameters,
+  // but signing will currently always use production Fulcio/Rekor.
+  if options.endpoints.fulcio_url != crate::DEFAULT_FULCIO_URL
+    || options.endpoints.rekor_url != crate::DEFAULT_REKOR_URL
+  {
+    tracing::warn!(
+      fulcio_url = %options.endpoints.fulcio_url,
+      rekor_url = %options.endpoints.rekor_url,
+      "Custom Fulcio/Rekor endpoints are not supported by sigstore-rs SigningContext; using production endpoints"
+    );
+  }
+
   let signing_ctx = sigstore::bundle::sign::SigningContext::async_production()
     .await
     .context("Failed to initialize Sigstore signing context")?;
@@ -82,7 +101,7 @@ pub async fn sign_blob(data: &[u8], options: &SignOptions) -> Result<SignResult>
     )
   } else {
     tracing::debug!("Starting interactive OIDC flow");
-    obtain_identity_token(&options.endpoints)?
+    obtain_identity_token(&options.endpoints).await?
   };
 
   // Create signing session
@@ -108,7 +127,7 @@ pub async fn sign_blob(data: &[u8], options: &SignOptions) -> Result<SignResult>
     .verification_material
     .as_ref()
     .and_then(|vm| vm.tlog_entries.first())
-    .map(|entry| entry.log_index as u64);
+    .and_then(|entry| u64::try_from(entry.log_index).ok());
 
   // Compute digest for the bundle block
   let digest = compute_digest(options.digest_algorithm, data);
@@ -205,32 +224,56 @@ fn extract_bundle_info(bundle: &sigstore::bundle::Bundle) -> Result<(String, Str
 }
 
 /// Perform interactive OIDC authorization flow.
-fn obtain_identity_token(endpoints: &SigstoreEndpoints) -> Result<sigstore::oauth::IdentityToken> {
+async fn obtain_identity_token(
+  endpoints: &SigstoreEndpoints,
+) -> Result<sigstore::oauth::IdentityToken> {
   tracing::debug!("Initiating OIDC authorization");
+
+  // Choose an available local port for the redirect listener.
+  // Defaults to dynamic port (0) but can be overridden via OIDC_REDIRECT_PORT env var.
+  let requested_port = std::env::var("OIDC_REDIRECT_PORT")
+    .ok()
+    .and_then(|s| s.parse::<u16>().ok())
+    .unwrap_or(0); // 0 = let OS choose a free port
+
+  let listener = std::net::TcpListener::bind(format!("127.0.0.1:{requested_port}"))
+    .context("Failed to bind local redirect listener socket")?;
+  let port = listener
+    .local_addr()
+    .context("Failed to get local redirect listener address")?
+    .port();
+  drop(listener); // Release the port for sigstore's own listener
+
+  let redirect_uri = format!("http://localhost:{port}");
 
   let oidc_url = sigstore::oauth::openidflow::OpenIDAuthorize::new(
     &endpoints.oidc_client_id,
     &endpoints.oidc_client_secret,
     &endpoints.oidc_issuer,
-    "http://localhost:8080",
+    &redirect_uri,
   )
-  .auth_url()
+  .auth_url_async()
+  .await
   .context("Failed to create OIDC authorization URL")?;
 
   // Open browser for user authorization
   webbrowser::open(oidc_url.0.as_ref()).context("Failed to open browser for OIDC authorization")?;
 
-  tracing::debug!("Waiting for OIDC callback");
+  tracing::debug!(port = port, "Waiting for OIDC callback");
   let listener = sigstore::oauth::openidflow::RedirectListener::new(
-    "127.0.0.1:8080",
+    &format!("127.0.0.1:{port}"),
     oidc_url.1, // client
     oidc_url.2, // nonce
     oidc_url.3, // pkce_verifier
   );
 
-  let (_, token) = listener
-    .redirect_listener()
-    .context("Failed to obtain identity token")?;
+  let (_, token) = tokio::time::timeout(
+    Duration::from_secs(5 * 60),
+    listener.redirect_listener_async(),
+  )
+  .await
+  .context("Timed out waiting for OIDC callback")?
+  .context("Failed to obtain identity token")?;
 
   tracing::debug!("Identity token obtained");
   Ok(sigstore::oauth::IdentityToken::from(token))

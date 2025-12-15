@@ -1,22 +1,19 @@
 //! Integration tests for challenge-response workflow
 
 use openpgp::cert::prelude::*;
-use openpgp::parse::Parse;
 use pdf_sign_gpg::challenge::{Challenge, ChallengeOptions, prepare_challenge, validate_response};
 use sequoia_openpgp as openpgp;
 
-const TEST_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mDMEZ0OnvBYJKwYBBAHaRw8BAQdAQwKBx+5EbKe8wCVyD8CqmqOZdUqH0vX9pLPc
-KqXZCZC0KFRlc3QgVXNlciA8dGVzdEB0ZXN0LmNvbT4gwYkBJwQTAQgAEQUCZ0On
-vAIbAwIJCQIWAAIeAQAKCRCqnFhz1KVJoK4EAP4+8zzVG7g6xXFPvqPMjR5xfJ5M
-nqF8h8j3vCE1YGg8AQD7kj8hKYv6uPrN9p0vN7xQgLKk3J8c4wWFhMc7H1B3Ag==
-=ABCD
------END PGP PUBLIC KEY BLOCK-----"#;
+fn make_test_cert() -> Cert {
+  let (cert, _revocation) = CertBuilder::general_purpose(Some("CI Test <ci@example.invalid>"))
+    .generate()
+    .expect("Failed to generate cert");
+  cert
+}
 
 #[test]
 fn test_prepare_challenge() {
-  let cert = Cert::from_bytes(TEST_CERT.as_bytes()).expect("Failed to parse cert");
+  let cert = make_test_cert();
   let data = b"test data to sign";
 
   let options = ChallengeOptions { embed_uid: false };
@@ -30,7 +27,7 @@ fn test_prepare_challenge() {
 
 #[test]
 fn test_challenge_with_embed_uid() {
-  let cert = Cert::from_bytes(TEST_CERT.as_bytes()).expect("Failed to parse cert");
+  let cert = make_test_cert();
   let data = b"test data";
 
   let options = ChallengeOptions { embed_uid: true };
@@ -59,6 +56,7 @@ fn test_challenge_serialization() {
 
 #[test]
 fn test_validate_response_rejects_invalid_signature() {
+  let cert = make_test_cert();
   let challenge = Challenge {
     version: 1,
     data_to_sign: b"test data".to_vec(),
@@ -70,6 +68,6 @@ fn test_validate_response_rejects_invalid_signature() {
   // Invalid signature (not a valid PGP signature)
   let invalid_sig = b"not a signature";
 
-  let result = validate_response(&challenge, invalid_sig);
+  let result = validate_response(&challenge, invalid_sig, &cert);
   assert!(result.is_err());
 }

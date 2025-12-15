@@ -53,7 +53,13 @@ pub fn load_keybox_certs() -> Result<Vec<Cert>> {
     };
 
     let certs = match kbx
-      .filter_map(|r| r.ok())
+      .filter_map(|r| match r {
+        Ok(record) => Some(record),
+        Err(e) => {
+          tracing::warn!("Skipping malformed keybox record: {}", e);
+          None
+        }
+      })
       .filter_map(|r| match r {
         KeyboxRecord::OpenPGP(o) => Some(o.cert()),
         _ => None,
@@ -134,8 +140,10 @@ pub fn load_cert(spec: &str) -> Result<Cert> {
   let path = Path::new(spec);
   if path.exists() {
     tracing::debug!("Loading certificate from file");
-    return Cert::from_bytes(&std::fs::read(path)?)
-      .with_context(|| format!("Failed to load certificate from file: {}", path.display()));
+    let bytes = std::fs::read(path)
+      .with_context(|| format!("Failed to read certificate file: {}", path.display()))?;
+    return Cert::from_bytes(&bytes)
+      .with_context(|| format!("Failed to parse certificate from file: {}", path.display()));
   }
 
   tracing::debug!("Searching GnuPG keybox");

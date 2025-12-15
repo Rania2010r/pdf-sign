@@ -120,12 +120,18 @@ pub fn verify_pdf(
     let cert_identity_matcher = match (certificate_identity, certificate_identity_regexp) {
       (Some(exact), None) => Some(CertificateIdentityMatcher::Exact(exact)),
       (None, Some(re)) => Some(CertificateIdentityMatcher::Regexp(re)),
+      (Some(_), Some(_)) => {
+        bail!("Cannot specify both --certificate-identity and --certificate-identity-regexp")
+      }
       _ => None,
     };
 
     let cert_issuer_matcher = match (certificate_oidc_issuer, certificate_oidc_issuer_regexp) {
       (Some(exact), None) => Some(OidcIssuerMatcher::Exact(exact)),
       (None, Some(re)) => Some(OidcIssuerMatcher::Regexp(re)),
+      (Some(_), Some(_)) => {
+        bail!("Cannot specify both --certificate-oidc-issuer and --certificate-oidc-issuer-regexp")
+      }
       _ => None,
     };
 

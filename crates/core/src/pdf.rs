@@ -46,4 +46,10 @@ mod tests {
     assert_eq!(clean, b"%%PDF-1.4\ncontent%%EOF");
     assert_eq!(suffix, b"suffix");
   }
+
+  #[test]
+  fn errors_when_no_eof_marker() {
+    let invalid = b"%%PDF-1.4\n...content...";
+    assert!(find_eof_offset(invalid).is_err());
+  }
 }

@@ -6,11 +6,11 @@
   system,
 }:
 let
-  # Our repo's `.cargo/config.toml` sets `[build] target = [...]` for IDE analysis.
-  # In Nix builds we typically only have std installed for the host target, so
-  # force Cargo to build for the host here to keep `flake check` reproducible.
-  cargoTarget =
-    if pkgs.stdenv.hostPlatform.isDarwin then "aarch64-apple-darwin" else "x86_64-unknown-linux-gnu";
+  # Ensure we build for the host Rust target triple.
+  #
+  # This avoids picking an incorrect default target in CI (e.g. forcing x86_64
+  # on aarch64) and keeps `flake check` reproducible across platforms.
+  cargoTarget = pkgs.stdenv.hostPlatform.rust.rustcTarget or pkgs.stdenv.hostPlatform.config;
 in
 {
   pre-commit-check = import ./git-hooks.nix {

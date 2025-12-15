@@ -68,10 +68,15 @@ rec {
       WorkingDir = "/data";
       Env = [
         "GNUPGHOME=/gnupg"
+        # OIDC_REDIRECT_PORT can be set at runtime for Sigstore signing
       ];
       Volumes = {
         "/gnupg" = { };
         "/data" = { };
+      };
+      ExposedPorts = {
+        # Dynamic OIDC redirect port (can be mapped with -p)
+        "8080/tcp" = { };
       };
     };
   };

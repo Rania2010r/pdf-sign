@@ -117,7 +117,7 @@ pub fn apply_response(
   let signature_data = signature_armored.as_bytes().to_vec();
 
   // Validate signature cryptographically
-  validate_response(challenge, &signature_data)?;
+  validate_response(challenge, &signature_data, cert)?;
 
   let fingerprint = cert.fingerprint().to_string();
   let uids: Vec<String> = cert
@@ -143,7 +143,7 @@ pub fn apply_response(
 /// This function cryptographically verifies that the signature was
 /// created for the challenge's data.
 #[tracing::instrument(skip(challenge, signature))]
-pub fn validate_response(challenge: &Challenge, signature: &[u8]) -> Result<()> {
+pub fn validate_response(challenge: &Challenge, signature: &[u8], cert: &Cert) -> Result<()> {
   // Parse the signature
   let signature_reader = armor::Reader::from_bytes(
     signature,
@@ -154,22 +154,42 @@ pub fn validate_response(challenge: &Challenge, signature: &[u8]) -> Result<()> 
   let policy = StandardPolicy::new();
 
   // Helper for verification
-  struct Helper;
-  impl VerificationHelper for Helper {
+  struct Helper<'a> {
+    cert: &'a Cert,
+  }
+
+  impl VerificationHelper for Helper<'_> {
     fn get_certs(&mut self, _ids: &[openpgp::KeyHandle]) -> openpgp::Result<Vec<Cert>> {
-      // We don't verify the cert here, just check signature structure
-      Ok(Vec::new())
+      Ok(vec![self.cert.clone()])
     }
 
-    fn check(&mut self, _structure: MessageStructure) -> openpgp::Result<()> {
-      // Basic structure check only
-      Ok(())
+    fn check(&mut self, structure: MessageStructure) -> openpgp::Result<()> {
+      let mut has_valid_signature = false;
+      for layer in structure {
+        if let MessageLayer::SignatureGroup { results } = layer {
+          for result in results {
+            if result.is_ok() {
+              has_valid_signature = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if has_valid_signature {
+        Ok(())
+      } else {
+        Err(openpgp::Error::InvalidOperation("No valid signature".into()).into())
+      }
     }
   }
 
   // Try to parse as a detached signature
-  let mut verifier =
-    DetachedVerifierBuilder::from_reader(signature_reader)?.with_policy(&policy, None, Helper)?;
+  let mut verifier = DetachedVerifierBuilder::from_reader(signature_reader)?.with_policy(
+    &policy,
+    None,
+    Helper { cert },
+  )?;
 
   // Verify against challenge data
   verifier

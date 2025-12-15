@@ -101,6 +101,12 @@ mod tests {
     let data = b"hello";
     let digest = compute_digest(DigestAlgorithm::Sha512, data);
     assert_eq!(digest.len(), 64);
+    // Known SHA-512 of "hello"
+    let expected_hex = "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043";
+    let expected: Vec<u8> = (0..64)
+      .map(|i| u8::from_str_radix(&expected_hex[i * 2..i * 2 + 2], 16).unwrap())
+      .collect();
+    assert_eq!(digest, expected);
   }
 
   #[test]

@@ -66,6 +66,7 @@ pub enum Commands {
     oidc_client_secret: Option<String>,
 
     /// Identity token (JWT) for non-interactive signing (Sigstore backend, CI mode)
+    /// Can also be set via SIGSTORE_IDENTITY_TOKEN environment variable
     #[arg(long)]
     identity_token: Option<String>,
 
